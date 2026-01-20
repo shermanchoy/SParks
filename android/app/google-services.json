@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "21879431573",
+    "project_id": "spdating-b6c70",
+    "storage_bucket": "spdating-b6c70.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:21879431573:android:fd5e85fe1e5d12feb7969c",
+        "android_client_info": {
+          "package_name": "com.example.dating"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkXUGW9gk34E6Wd0E-K2iQMUpk7Q_sBIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
