@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
 import 'routes.dart';
 import 'utils/theme.dart';
+import 'utils/theme_controller.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'HeartSPace',
-      debugShowCheckedModeBanner: false,
-      theme: buildRedWhiteTheme(),
-      initialRoute: Routes.splash,
-      routes: buildRoutes(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: themeController.isDark,
+      builder: (context, isDark, _) {
+        return MaterialApp(
+          title: 'sparks',
+          debugShowCheckedModeBanner: false,
+
+          theme: buildSParksTheme(isDark: false),
+          darkTheme: buildSParksTheme(isDark: true),
+          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+
+          initialRoute: Routes.splash,
+          routes: buildRoutes(),
+        );
+      },
     );
   }
 }

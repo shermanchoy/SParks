@@ -3,54 +3,65 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class MatchService {
   final _db = FirebaseFirestore.instance;
 
-  String matchIdFor(String a, String b) {
-    final s = [a, b]..sort();
-    return '${s[0]}_${s[1]}';
-  }
-
-  DocumentReference<Map<String, dynamic>> _outgoingLikeRef(
-    String fromUid,
-    String toUid,
-  ) {
-    return _db
-        .collection('likes')
-        .doc(fromUid)
-        .collection('outgoing')
-        .doc(toUid);
-  }
-
-  DocumentReference<Map<String, dynamic>> _incomingLikeRef(
-    String toUid,
-    String fromUid,
-  ) {
-    return _db
-        .collection('likes')
-        .doc(toUid)
-        .collection('incoming')
-        .doc(fromUid);
-  }
-
-  Future<bool> likeUser({
+  /// returns chatId if matched, otherwise null
+  Future<String?> likeUser({
     required String currentUid,
     required String otherUid,
+    required String currentName,
+    required String otherName,
   }) async {
-    final now = FieldValue.serverTimestamp();
+    final otherLikeRef =
+        _db.collection('likes').doc(otherUid).collection('liked').doc(currentUid);
 
-    await _outgoingLikeRef(currentUid, otherUid).set({'createdAt': now});
-    await _incomingLikeRef(otherUid, currentUid).set({'createdAt': now});
+    final myLikeRef =
+        _db.collection('likes').doc(currentUid).collection('liked').doc(otherUid);
 
-    final reciprocal = await _outgoingLikeRef(otherUid, currentUid).get();
-    if (!reciprocal.exists) return false;
+    // record my like
+    await myLikeRef.set({
+      'uid': otherUid,
+      'ts': FieldValue.serverTimestamp(),
+    });
 
-    final matchId = matchIdFor(currentUid, otherUid);
+    final otherLikeSnap = await otherLikeRef.get();
 
-    await _db.collection('matches').doc(matchId).set({
+    // NOT a match yet
+    if (!otherLikeSnap.exists) return null;
+
+    // MATCH 🔥
+    final chatRef = await _db.collection('chats').add({
       'users': [currentUid, otherUid],
-      'createdAt': now,
-      'lastMessage': null,
-      'lastMessageAt': null,
-    }, SetOptions(merge: true));
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
-    return true;
+    final chatId = chatRef.id;
+
+    // save match for both users
+    await _db
+        .collection('matches')
+        .doc(currentUid)
+        .collection('list')
+        .doc(otherUid)
+        .set({
+      'uid': otherUid,
+      'chatId': chatId,
+      'name': otherName,
+    });
+
+    await _db
+        .collection('matches')
+        .doc(otherUid)
+        .collection('list')
+        .doc(currentUid)
+        .set({
+      'uid': currentUid,
+      'chatId': chatId,
+      'name': currentName,
+    });
+
+    return chatId;
+  }
+
+  Stream<QuerySnapshot> watchMatchesRaw(String uid) {
+    return _db.collection('matches').doc(uid).collection('list').snapshots();
   }
 }

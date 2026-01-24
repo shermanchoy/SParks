@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+
 import 'services/auth_service.dart';
 import 'services/firestore_service.dart';
+
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_shell.dart';
 import 'screens/onboarding/splashscreen.dart';
+
+// ADD THIS
+import 'screens/chat/chat_room_screen.dart';
 
 class Routes {
   static const splash = '/';
@@ -14,6 +19,9 @@ class Routes {
   static const register = '/register';
   static const onboarding = '/onboarding';
   static const home = '/home';
+
+  // ADD THIS
+  static const chat = '/chat';
 }
 
 Map<String, WidgetBuilder> buildRoutes() {
@@ -24,6 +32,9 @@ Map<String, WidgetBuilder> buildRoutes() {
     Routes.onboarding: (_) => const OnboardingScreen(),
     Routes.home: (_) => const HomeShell(),
     Routes.splash: (_) => const SplashScreen(),
+
+    // ADD THIS
+    Routes.chat: (_) => const ChatRoomScreen(),
   };
 }
 

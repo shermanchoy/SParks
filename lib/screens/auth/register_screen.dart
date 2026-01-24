@@ -91,6 +91,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Back to login'),
               ),
+              const SizedBox(height: 14),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Logout'),
+                    onPressed: () async {
+                      await AuthService().signOut();
+
+                      if (!mounted) return;
+
+                      // If you use named routes, change this to your login route
+                      Navigator.of(context)
+                          .pushNamedAndRemoveUntil('/login', (r) => false);
+                    },
+                  ),
+                ),
+              ),
             ],
           ),
         ),

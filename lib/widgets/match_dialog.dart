@@ -16,7 +16,7 @@ Future<void> showMatchDialog(
         child: Material(
           color: Colors.transparent,
           child: Container(
-            width: 340,
+            width: 360,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,

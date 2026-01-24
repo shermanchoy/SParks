@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               SizedBox(height: 14),
               Text(
-                'HeartSPace',
+                'sparks',
                 style: TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.w800,
