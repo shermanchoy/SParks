@@ -22,6 +22,23 @@ class Routes {
 
   // ADD THIS
   static const chat = '/chat';
+
+  /// Web-friendly chat route that survives refresh:
+  /// `/chat?chatId=...&otherUid=...&otherName=...`
+  static String chatRoute({
+    required String chatId,
+    required String otherUid,
+    required String otherName,
+  }) {
+    return Uri(
+      path: chat,
+      queryParameters: {
+        'chatId': chatId,
+        'otherUid': otherUid,
+        'otherName': otherName,
+      },
+    ).toString();
+  }
 }
 
 Map<String, WidgetBuilder> buildRoutes() {

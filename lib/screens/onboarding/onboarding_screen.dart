@@ -85,6 +85,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       bio: _bio.text.trim(),
       interests: _interests,
       intent: _intent,
+      photoUrl: '',
+      photoPath: '',
       createdAt: now,
       updatedAt: now,
     );
@@ -127,8 +129,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                   DropdownButtonFormField<String>(
                     value: _school,
+                    isExpanded: true,
                     items: SchoolList.schools
                         .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                        .toList(),
+                    selectedItemBuilder: (context) => SchoolList.schools
+                        .map((s) => Text(s, overflow: TextOverflow.ellipsis, maxLines: 1))
                         .toList(),
                     onChanged: (v) => setState(() => _school = v),
                     decoration: const InputDecoration(labelText: 'School'),

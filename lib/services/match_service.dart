@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'notification_service.dart';
+
 class MatchService {
   final _db = FirebaseFirestore.instance;
+  final _notifs = NotificationService();
 
   /// returns chatId if matched, otherwise null
   Future<String?> likeUser({
@@ -21,6 +24,13 @@ class MatchService {
       'uid': otherUid,
       'ts': FieldValue.serverTimestamp(),
     });
+
+    // notify the other user they got a like
+    await _notifs.pushLikeNotification(
+      toUid: otherUid,
+      fromUid: currentUid,
+      fromName: currentName,
+    );
 
     final otherLikeSnap = await otherLikeRef.get();
 
@@ -57,6 +67,10 @@ class MatchService {
       'chatId': chatId,
       'name': currentName,
     });
+
+    // notify both users of the match
+    await _notifs.pushMatchNotification(toUid: currentUid, otherName: otherName);
+    await _notifs.pushMatchNotification(toUid: otherUid, otherName: currentName);
 
     return chatId;
   }

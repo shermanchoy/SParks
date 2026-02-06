@@ -5,6 +5,8 @@ import '../../models/app_user.dart';
 import '../../routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/match_service.dart';
+import '../../widgets/match_dialog.dart';
+import '../../widgets/user_card.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -149,33 +151,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _showMatchDialog(AppUser other, String chatId) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text("It's a match!"),
-          content: Text('You matched with ${other.name.isNotEmpty ? other.name : "Someone"}'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Later'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pushNamed(
-                  context,
-                  Routes.chat,
-                  arguments: {
-                    'chatId': chatId,
-                    'otherUid': other.uid,
-                    'otherName': other.name.isNotEmpty ? other.name : 'Someone',
-                  },
-                );
-              },
-              child: const Text('Go say hi'),
-            ),
-          ],
+    final otherName = other.name.isNotEmpty ? other.name : 'Someone';
+    await showMatchDialog(
+      context,
+      otherName: otherName,
+      onSayHi: () {
+        Navigator.pushNamed(
+          context,
+          Routes.chatRoute(
+            chatId: chatId,
+            otherUid: other.uid,
+            otherName: otherName,
+          ),
+          arguments: {
+            'chatId': chatId,
+            'otherUid': other.uid,
+            'otherName': otherName,
+          },
         );
       },
     );
@@ -183,17 +175,48 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_status != null) return Center(child: Text(_status!));
+    if (_status != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 36, color: cs.error),
+              const SizedBox(height: 10),
+              Text(_status!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (_stack.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('No more users to show.'),
+            Icon(Icons.explore_off_outlined, size: 40, color: cs.onSurfaceVariant),
+            const SizedBox(height: 10),
+            Text(
+              'No more users right now.',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: _load, child: const Text('Reload')),
+            FilledButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reload'),
+            ),
           ],
         ),
       );
@@ -201,67 +224,116 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
     final u = _stack.first;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Expanded(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      u.name.isNotEmpty ? u.name : 'Someone',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, anim) {
+                        final slide = Tween<Offset>(
+                          begin: const Offset(0, 0.03),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
+                        return FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(position: slide, child: child),
+                        );
+                      },
+                      child: KeyedSubtree(
+                        key: ValueKey(u.uid),
+                        child: UserCard(user: u),
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    if (u.school.isNotEmpty) Text(u.school),
-                    const SizedBox(height: 6),
-                    if (u.course.isNotEmpty) Text(u.course),
-                    const SizedBox(height: 12),
-                    if (u.intent.isNotEmpty) Text(u.intent),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: u.interests.map((t) => Chip(label: Text(t))).toList(),
+                  ),
+                  if (_busy)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          minHeight: 6,
+                          backgroundColor: cs.surfaceVariant.withOpacity(0.7),
+                        ),
+                      ),
                     ),
-                    const Spacer(),
-                    if (_busy) const LinearProgressIndicator(),
-                  ],
-                ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              IconButton(
-                tooltip: 'Back',
-                onPressed: _history.isEmpty ? null : _goBack,
-                icon: const Icon(Icons.undo),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _busy ? null : _passTop,
-                  icon: const Icon(Icons.close),
-                  label: const Text('Pass'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _RoundActionButton(
+                  tooltip: 'Undo',
+                  icon: Icons.undo_rounded,
+                  onPressed: (_history.isEmpty || _busy) ? null : _goBack,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _likeTop,
-                  icon: const Icon(Icons.favorite),
-                  label: const Text('Like'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _passTop,
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Pass'),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _busy ? null : _likeTop,
+                    icon: const Icon(Icons.favorite_rounded),
+                    label: const Text('Like'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundActionButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _RoundActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: cs.outlineVariant.withOpacity(0.7)),
+      ),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Tooltip(
+            message: tooltip,
+            child: Icon(icon, color: onPressed == null ? cs.onSurface.withOpacity(0.35) : null),
           ),
-        ],
+        ),
       ),
     );
   }

@@ -154,10 +154,15 @@ _school = allowed.contains(u.school) ? u.school : '';
 
                   DropdownButtonFormField<String>(
                     value: _school,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'School'),
                     items: SchoolList.schools
                         .map((s) =>
                             DropdownMenuItem(value: s, child: Text(s)))
+                        .toList(),
+                    selectedItemBuilder: (context) => SchoolList.schools
+                        .map((s) => Text(s,
+                            overflow: TextOverflow.ellipsis, maxLines: 1))
                         .toList(),
                     onChanged: (v) => setState(() => _school = v),
                   ),

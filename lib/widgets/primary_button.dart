@@ -14,12 +14,13 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = loading == true;
     return SizedBox(
       width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: loading ? null : onPressed,
-        child: loading
+      height: 52,
+      child: FilledButton(
+        onPressed: isLoading ? null : onPressed,
+        child: isLoading
             ? const SizedBox(
                 width: 20,
                 height: 20,

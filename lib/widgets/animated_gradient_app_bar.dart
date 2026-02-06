@@ -5,8 +5,10 @@ class SparksTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final arksColor = isDark ? Colors.white : Colors.black;
+    final theme = Theme.of(context);
+    // This title is primarily used on our gradient app bars.
+    // Use a high-contrast color consistently.
+    final arksColor = theme.colorScheme.onPrimary;
 
     return RichText(
       text: TextSpan(
@@ -41,6 +43,10 @@ class AnimatedGradientAppBar extends StatelessWidget implements PreferredSizeWid
       automaticallyImplyLeading: false,
       elevation: 0,
       centerTitle: true,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -60,7 +66,11 @@ class AnimatedGradientAppBar extends StatelessWidget implements PreferredSizeWid
           if (subtitle != null)
             Text(
               subtitle!,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withOpacity(0.90),
+              ),
             ),
         ],
       ),

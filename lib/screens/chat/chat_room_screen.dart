@@ -1,7 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../services/auth_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/storage_service.dart';
+import '../../services/image_moderation_service.dart';
+import '../../models/app_user.dart';
+import '../../widgets/message_bubble.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   const ChatRoomScreen({super.key});
@@ -15,13 +23,35 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   String? _chatId;
   String _otherName = 'Chat';
+  String? _otherUid;
 
   String? _myUid;
+  String _myName = 'Someone';
+  final _notifs = NotificationService();
+  final _storage = StorageService();
+  final _moderation = ImageModerationService();
+  final _imagePicker = ImagePicker();
+  bool _sendingPhoto = false;
 
   @override
   void initState() {
     super.initState();
     _myUid = AuthService().currentUser?.uid;
+    _loadMyName();
+  }
+
+  Future<void> _loadMyName() async {
+    final uid = _myUid;
+    if (uid == null) return;
+    try {
+      final meDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (!meDoc.exists) return;
+      final me = AppUser.fromDoc(meDoc);
+      if (!mounted) return;
+      setState(() => _myName = me.name.trim().isEmpty ? 'Someone' : me.name.trim());
+    } catch (_) {
+      // best-effort; notifications can still send without name
+    }
   }
 
   @override
@@ -32,10 +62,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (args is Map) {
       final chatId = args['chatId']?.toString();
       final otherName = args['otherName']?.toString();
+      final otherUid = args['otherUid']?.toString();
 
       setState(() {
         _chatId = chatId;
         _otherName = (otherName != null && otherName.isNotEmpty) ? otherName : 'Chat';
+        _otherUid = (otherUid != null && otherUid.isNotEmpty) ? otherUid : null;
       });
     }
   }
@@ -43,6 +75,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> _send() async {
     final chatId = _chatId;
     final myUid = _myUid;
+    final otherUid = _otherUid;
     final text = _textCtrl.text.trim();
 
     if (chatId == null || chatId.isEmpty) return;
@@ -60,6 +93,96 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       'senderId': myUid,
       'ts': FieldValue.serverTimestamp(),
     });
+
+    // notify the other user (best-effort). If otherUid isn't provided, we skip.
+    if (otherUid != null && otherUid.isNotEmpty) {
+      await _notifs.pushMessageNotification(
+        toUid: otherUid,
+        fromUid: myUid,
+        fromName: _myName,
+        chatId: chatId,
+        text: text,
+      );
+    }
+  }
+
+  Future<void> _sendPhoto() async {
+    final chatId = _chatId;
+    final myUid = _myUid;
+    final otherUid = _otherUid;
+
+    if (chatId == null || chatId.isEmpty || myUid == null) return;
+    if (_sendingPhoto) return;
+
+    final picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    final bytes = await picked.readAsBytes();
+    if (bytes.isEmpty || !mounted) return;
+
+    setState(() => _sendingPhoto = true);
+
+    try {
+      final allowed = await _moderation.isImageAppropriate(bytes);
+      if (!mounted) return;
+      if (!allowed) {
+        setState(() => _sendingPhoto = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "This photo wasn't sent. It doesn't meet our community guidelines.",
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      final url = await _storage.uploadChatPhoto(
+        chatId: chatId,
+        senderId: myUid,
+        bytes: Uint8List.fromList(bytes),
+      );
+      if (!mounted) return;
+
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .add({
+        'text': '',
+        'imageUrl': url,
+        'senderId': myUid,
+        'ts': FieldValue.serverTimestamp(),
+      });
+
+      if (otherUid != null && otherUid.isNotEmpty) {
+        await _notifs.pushMessageNotification(
+          toUid: otherUid,
+          fromUid: myUid,
+          fromName: _myName,
+          chatId: chatId,
+          text: 'Sent a photo',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not send photo: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingPhoto = false);
+    }
   }
 
   @override
@@ -70,11 +193,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final chatId = _chatId;
 
     if (chatId == null || chatId.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: Text(_otherName)),
+        appBar: AppBar(title: Text(_otherName), centerTitle: true),
         body: const Center(child: Text('Missing chatId')),
       );
     }
@@ -87,7 +212,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         .snapshots();
 
     return Scaffold(
-      appBar: AppBar(title: Text(_otherName)),
+      appBar: AppBar(title: Text(_otherName), centerTitle: true),
       body: Column(
         children: [
           Expanded(
@@ -103,63 +228,109 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
                 final docs = snap.data?.docs ?? [];
                 if (docs.isEmpty) {
-                  return const Center(child: Text('Say hi 👋'));
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.chat_bubble_outline, color: cs.onSurfaceVariant, size: 36),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Say hi 👋',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Start the convo — be nice.',
+                            style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
                 }
 
                 return ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
                     final data = docs[i].data() as Map<String, dynamic>;
                     final text = (data['text'] ?? '').toString();
+                    final imageUrl = (data['imageUrl'] ?? '').toString();
                     final senderId = (data['senderId'] ?? '').toString();
                     final mine = senderId == _myUid;
 
-                    return Align(
-                      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        decoration: BoxDecoration(
-                          color: mine
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          text,
-                          style: TextStyle(
-                            color: mine ? Colors.white : null,
-                          ),
-                        ),
-                      ),
+                    return MessageBubble(
+                      isMe: mine,
+                      isBot: false,
+                      text: text,
+                      imageUrl: imageUrl.isEmpty ? null : imageUrl,
                     );
                   },
                 );
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: cs.outlineVariant.withOpacity(0.65)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(theme.brightness == Brightness.dark ? 0.22 : 0.07),
+                      blurRadius: 22,
+                      offset: const Offset(0, 12),
                     ),
-                    onSubmitted: (_) => _send(),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                IconButton(
-                  onPressed: _send,
-                  icon: const Icon(Icons.send),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: _sendingPhoto ? null : _sendPhoto,
+                      icon: _sendingPhoto
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.photo_library_rounded),
+                      tooltip: 'Send photo',
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _textCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message…',
+                          border: InputBorder.none,
+                          filled: false,
+                        ),
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _send(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 44,
+                      child: FilledButton(
+                        onPressed: _send,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                        ),
+                        child: const Icon(Icons.send_rounded, size: 18),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],

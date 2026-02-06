@@ -9,6 +9,8 @@ class MatchesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final uid = AuthService().currentUser?.uid;
     if (uid == null) {
       return const Center(child: Text('Please login again.'));
@@ -33,7 +35,25 @@ class MatchesScreen extends StatelessWidget {
 
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {
-          return const Center(child: Text('No matches yet.'));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.favorite_border, size: 40, color: cs.onSurfaceVariant),
+                  const SizedBox(height: 10),
+                  Text('No matches yet.', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    'When you match with someone, they’ll show up here.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         return ListView.separated(
@@ -45,26 +65,78 @@ class MatchesScreen extends StatelessWidget {
             final otherUid = (data['uid'] ?? '').toString();
             final otherName = (data['name'] ?? 'Someone').toString();
             final chatId = (data['chatId'] ?? '').toString();
+            final label = otherName.trim().isEmpty ? 'Someone' : otherName.trim();
+            final initial = label.characters.isEmpty ? '?' : label.characters.first.toUpperCase();
+            final canChat = chatId.isNotEmpty;
 
-            return Card(
-              child: ListTile(
-                title: Text(otherName),
-                subtitle: Text(otherUid.isEmpty ? '' : 'Matched user'),
-                trailing: FilledButton(
-                  onPressed: chatId.isEmpty
-                      ? null
-                      : () {
-                          Navigator.pushNamed(
-                            context,
-                            Routes.chat,
-                            arguments: {
-                              'chatId': chatId,
-                              'otherUid': otherUid,
-                              'otherName': otherName,
-                            },
-                          );
-                        },
-                  child: const Text('Say hi'),
+            void openChat() {
+              if (!canChat) return;
+              Navigator.pushNamed(
+                context,
+                Routes.chatRoute(
+                  chatId: chatId,
+                  otherUid: otherUid,
+                  otherName: label,
+                ),
+                arguments: {
+                  'chatId': chatId,
+                  'otherUid': otherUid,
+                  'otherName': label,
+                },
+              );
+            }
+
+            return TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: Duration(milliseconds: 240 + (i.clamp(0, 8) * 45)),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, child) {
+                final slide = (1 - v) * 10;
+                return Opacity(
+                  opacity: v,
+                  child: Transform.translate(offset: Offset(0, slide), child: child),
+                );
+              },
+              child: Card(
+                child: ListTile(
+                  onTap: openChat,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          cs.primary,
+                          const Color(0xFFFF6B6B),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cs.primary.withOpacity(theme.brightness == Brightness.dark ? 0.28 : 0.20),
+                          blurRadius: 16,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        initial,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  title: Text(label),
+                  subtitle: Text(canChat ? 'Tap to chat' : 'Setting up chat…'),
+                  trailing: FilledButton(
+                    onPressed: canChat ? openChat : null,
+                    child: const Text('Say hi'),
+                  ),
                 ),
               ),
             );

@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Needed for Firebase (Firestore/Storage/Auth) network calls in release builds -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="SParks"
         android:name="${applicationName}"

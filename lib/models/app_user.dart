@@ -10,6 +10,10 @@ class AppUser {
   final String bio;
   final List<String> interests;
 
+  /// Optional profile photo.
+  final String photoUrl;
+  final String photoPath;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +25,8 @@ class AppUser {
     required this.intent,
     required this.bio,
     required this.interests,
+    this.photoUrl = '',
+    this.photoPath = '',
     required this.createdAt,
     required this.updatedAt,
   });
@@ -47,6 +53,8 @@ class AppUser {
       intent: (d['intent'] ?? '').toString(),
       bio: (d['bio'] ?? '').toString(),
       interests: interests,
+      photoUrl: (d['photoUrl'] ?? '').toString(),
+      photoPath: (d['photoPath'] ?? '').toString(),
       createdAt: parseTime(d['createdAt']),
       updatedAt: parseTime(d['updatedAt']),
     );
@@ -60,6 +68,8 @@ class AppUser {
       'intent': intent,
       'bio': bio,
       'interests': interests,
+      'photoUrl': photoUrl,
+      'photoPath': photoPath,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

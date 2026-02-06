@@ -18,9 +18,11 @@ dependencies:
   provider: ^6.1.2
   intl: ^0.19.0
 
-  # Uncomment if you want profile photos
-  # firebase_storage: ^12.3.0
-  # image_picker: ^1.1.2
+  google_fonts: ^6.2.1
+  # Profile photos & chat photos
+  firebase_storage: ^12.3.0
+  image_picker: ^1.1.2
+  cloud_functions: ^5.2.0
 
 dev_dependencies:
   flutter_test:

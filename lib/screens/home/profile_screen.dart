@@ -1,9 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 
 import '../../models/app_user.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../utils/school_list.dart';
+import '../../services/storage_service.dart';
+import '../../widgets/network_circle_avatar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,6 +19,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _db = FirestoreService();
+  final _storage = StorageService();
 
   final _name = TextEditingController();
   final _course = TextEditingController();
@@ -28,9 +34,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _interestCtrl = TextEditingController();
 
   bool _saving = false;
+  bool _photoBusy = false;
+  double? _photoProgress; // 0..1 while uploading
   String? _status;
 
   AppUser? _current;
+  String _photoUrl = '';
+  String _photoPath = '';
+  Uint8List? _localPhotoBytes; // immediate preview after picking
 
   @override
   void initState() {
@@ -50,6 +61,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _name.text = u.name;
       _course.text = u.course;
       _bio.text = u.bio;
+      _photoUrl = u.photoUrl;
+      _photoPath = u.photoPath;
 
       _school = SchoolList.schools.contains(u.school) ? u.school : SchoolList.schools.first;
       _intent = _intents.contains(u.intent) ? u.intent : _intents.first;
@@ -60,6 +73,165 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     setState(() {});
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) return;
+    if (_photoBusy) return;
+
+    setState(() {
+      _photoBusy = true;
+      _photoProgress = null;
+      _status = null;
+    });
+
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 82,
+        maxWidth: 1024,
+      );
+      if (file == null) {
+        if (mounted) {
+          setState(() {
+            _photoBusy = false;
+            _photoProgress = null;
+          });
+        }
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      if (mounted) {
+        setState(() {
+          _localPhotoBytes = bytes;
+        });
+      }
+
+      final oldPath = _photoPath;
+      final uploaded = await _storage.uploadProfilePhoto(
+        uid: uid,
+        bytes: bytes,
+        onProgress: (p) {
+          if (!mounted) return;
+          setState(() => _photoProgress = p);
+        },
+      );
+
+      // Verify the URL is actually loadable (helps catch storage/CORS/rules issues immediately).
+      if (mounted) {
+        await precacheImage(
+          NetworkImage(uploaded.photoUrl),
+          context,
+        ).timeout(const Duration(seconds: 15));
+      }
+
+      // Show the new photo immediately (even if the Firestore merge below fails).
+      if (mounted) {
+        setState(() {
+          _photoUrl = uploaded.photoUrl;
+          _photoPath = uploaded.photoPath;
+          _photoBusy = false;
+          _photoProgress = null;
+          // keep local preview until remote loads fine
+        });
+      }
+
+      // Persist immediately so it "sticks" even if user doesn't hit Save Profile.
+      await _db.userRef(uid).set({
+        'photoUrl': uploaded.photoUrl,
+        'photoPath': uploaded.photoPath,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 20));
+
+      // Delete old image (best-effort) after new one is safely stored.
+      if (oldPath.trim().isNotEmpty && oldPath.trim() != uploaded.photoPath) {
+        await _storage.deleteByPath(oldPath);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _status = 'Photo updated!';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _photoBusy = false;
+        _photoProgress = null;
+        _status = 'Photo upload failed: $e';
+      });
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) return;
+    if (_photoBusy) return;
+
+    setState(() {
+      _photoBusy = true;
+      _status = null;
+    });
+
+    try {
+      final oldPath = _photoPath;
+      if (oldPath.trim().isNotEmpty) {
+        await _storage.deleteByPath(oldPath);
+      }
+
+      await _db.userRef(uid).set({
+        'photoUrl': '',
+        'photoPath': '',
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      setState(() {
+        _photoUrl = '';
+        _photoPath = '';
+        _localPhotoBytes = null;
+        _photoBusy = false;
+        _status = 'Photo removed';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _photoBusy = false;
+        _status = e.toString();
+      });
+    }
+  }
+
+  Future<void> _runStorageProbe() async {
+    if (_photoBusy) return;
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      setState(() => _status = 'Not logged in (no uid). Sign in, then try again.');
+      return;
+    }
+    setState(() {
+      _photoBusy = true;
+      _photoProgress = 0;
+      _status = null;
+    });
+    try {
+      final msg = await _storage.probe(uid: uid);
+      if (!mounted) return;
+      setState(() {
+        _status = msg;
+        _photoBusy = false;
+        _photoProgress = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _status = 'Probe failed: $e';
+        _photoBusy = false;
+        _photoProgress = null;
+      });
+    }
   }
 
   @override
@@ -106,6 +278,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         intent: _intent,
         bio: _bio.text.trim(),
         interests: List<String>.from(_interests),
+        photoUrl: _photoUrl,
+        photoPath: _photoPath,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       );
@@ -129,13 +303,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final successStatus = _status == 'Saved!' || _status == 'Photo updated!' || _status == 'Photo removed';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (_status != null) ...[
-          Text(_status!, style: TextStyle(color: _status == 'Saved!' ? Colors.green : Colors.red)),
+          Text(
+            _status!,
+            style: TextStyle(color: successStatus ? Colors.green : Colors.red),
+          ),
           const SizedBox(height: 12),
         ],
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.92, end: 1.0),
+                  duration: const Duration(milliseconds: 420),
+                  curve: Curves.easeOutBack,
+                  builder: (context, v, child) => Transform.scale(scale: v, child: child),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      NetworkCircleAvatar(
+                        radius: 48,
+                        url: _photoUrl,
+                        storagePath: _photoPath,
+                        placeholder: const Icon(Icons.person, size: 44),
+                      ),
+                      if (_localPhotoBytes != null)
+                        IgnorePointer(
+                          child: ClipOval(
+                            child: Image.memory(
+                              _localPhotoBytes!,
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.medium,
+                              gaplessPlayback: true,
+                            ),
+                          ),
+                        ),
+                      if (_photoBusy) ...[
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black.withOpacity(0.10),
+                            ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            value: (_photoProgress != null && _photoProgress! > 0 && _photoProgress! < 1)
+                                ? _photoProgress
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_photoBusy && _photoProgress != null)
+                  Text(
+                    '${(_photoProgress! * 100).round()}%',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _photoBusy ? null : _pickAndUploadPhoto,
+                      icon: const Icon(Icons.photo_camera),
+                      label: Text(_photoUrl.trim().isEmpty ? 'Add photo' : 'Change'),
+                    ),
+                    const SizedBox(width: 10),
+                    if (_photoUrl.trim().isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: _photoBusy ? null : _removePhoto,
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Remove'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _photoBusy ? null : _runStorageProbe,
+                  icon: const Icon(Icons.network_check),
+                  label: const Text('Test Storage connection'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
         TextField(
           controller: _name,
           decoration: const InputDecoration(labelText: 'Name'),
@@ -143,8 +409,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           value: _school,
+          isExpanded: true,
           items: SchoolList.schools
               .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+              .toList(),
+          selectedItemBuilder: (context) => SchoolList.schools
+              .map((s) => Text(s, overflow: TextOverflow.ellipsis, maxLines: 1))
               .toList(),
           onChanged: (v) => setState(() => _school = v ?? SchoolList.schools.first),
           decoration: const InputDecoration(labelText: 'School'),

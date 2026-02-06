@@ -20,11 +20,16 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       leading: leading,
       actions: actions,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
       title: Text(
         title,
         style: const TextStyle(
           fontWeight: FontWeight.w800,
           letterSpacing: 0.3,
+          color: Colors.white,
         ),
       ),
       flexibleSpace: Container(
