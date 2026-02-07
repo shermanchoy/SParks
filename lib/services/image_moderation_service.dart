@@ -7,32 +7,37 @@ import 'package:cloud_functions/cloud_functions.dart';
 ///
 /// Expects a Firebase Callable function named [moderateChatImage] that:
 /// - Accepts { "image": "<base64 string>" }
-/// - Returns { "allowed": true } if safe, { "allowed": false } if inappropriate.
-/// Deploy the Cloud Function (see /functions) to enable real moderation.
+/// - Returns { "allowed": boolean, "containsCat": boolean } (containsCat for blur on desktop/web).
 class ImageModerationService {
   static const _callableName = 'moderateChatImage';
 
-  /// Returns true if the image is appropriate to send; false if it should be flagged and not sent.
-  /// If the Cloud Function is not deployed (e.g. unavailability), we allow sending so the feature works.
-  Future<bool> isImageAppropriate(List<int> imageBytes) async {
-    if (imageBytes.isEmpty) return false;
-
+  /// Returns (allowed, containsCat). Use for chat: one call gives both moderation and cat flag.
+  /// Uses us-central1 to match deployed callable (required for web/Chrome).
+  Future<({bool allowed, bool containsCat})> getModerationResult(List<int> imageBytes) async {
+    if (imageBytes.isEmpty) return (allowed: false, containsCat: false);
     try {
       final base64Image = base64Encode(imageBytes);
-      final callable = FirebaseFunctions.instance.httpsCallable(_callableName);
-      final result = await callable.call<Map<String, dynamic>>(<String, dynamic>{'image': base64Image});
-      final data = result.data;
-      final allowed = data['allowed'];
-      return allowed == true;
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable(_callableName);
+      final result = await callable.call(<String, dynamic>{'image': base64Image});
+      final data = (result.data as Map<String, dynamic>?) ?? {};
+      final allowed = data['allowed'] == true;
+      final rawCat = data['containsCat'];
+      final containsCat = rawCat == true || rawCat == 'true' || rawCat == 1;
+      return (allowed: allowed, containsCat: containsCat);
     } on FirebaseFunctionsException catch (e) {
-      // Function not deployed or unavailable → allow send so chat photos work without backend
       if (e.code == 'not-found' || e.code == 'unavailable' || e.code == 'internal') {
-        return true;
+        return (allowed: true, containsCat: false);
       }
-      // Explicit rejection from function (e.g. inappropriate)
-      return false;
+      return (allowed: false, containsCat: false);
     } catch (_) {
-      return true;
+      return (allowed: true, containsCat: false);
     }
+  }
+
+  /// Returns true if the image is appropriate to send; false if it should be flagged and not sent.
+  Future<bool> isImageAppropriate(List<int> imageBytes) async {
+    final r = await getModerationResult(imageBytes);
+    return r.allowed;
   }
 }

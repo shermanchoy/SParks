@@ -13,6 +13,8 @@ class AppUser {
   /// Optional profile photo.
   final String photoUrl;
   final String photoPath;
+  /// When true, profile photo was flagged (e.g. cat detected) and is shown blurred with unblur option.
+  final bool photoFlaggedSensitive;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -27,6 +29,7 @@ class AppUser {
     required this.interests,
     this.photoUrl = '',
     this.photoPath = '',
+    this.photoFlaggedSensitive = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -55,6 +58,7 @@ class AppUser {
       interests: interests,
       photoUrl: (d['photoUrl'] ?? '').toString(),
       photoPath: (d['photoPath'] ?? '').toString(),
+      photoFlaggedSensitive: (d['photoFlaggedSensitive'] == true),
       createdAt: parseTime(d['createdAt']),
       updatedAt: parseTime(d['updatedAt']),
     );
@@ -70,6 +74,7 @@ class AppUser {
       'interests': interests,
       'photoUrl': photoUrl,
       'photoPath': photoPath,
+      'photoFlaggedSensitive': photoFlaggedSensitive,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

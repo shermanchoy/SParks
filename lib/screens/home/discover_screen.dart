@@ -92,6 +92,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         otherUid: other.uid,
         currentName: me?.name.isNotEmpty == true ? me!.name : 'Someone',
         otherName: other.name.isNotEmpty ? other.name : 'Someone',
+        otherPhotoUrl: other.photoUrl,
+        otherPhotoPath: other.photoPath,
+        otherPhotoFlaggedSensitive: other.photoFlaggedSensitive,
+        currentPhotoUrl: me?.photoUrl ?? '',
+        currentPhotoPath: me?.photoPath ?? '',
+        currentPhotoFlaggedSensitive: me?.photoFlaggedSensitive ?? false,
       );
 
       if (!mounted) return;

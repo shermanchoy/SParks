@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/app_user.dart';
 import 'network_circle_avatar.dart';
+import 'blurred_image_with_unblur.dart';
 
 class UserCard extends StatelessWidget {
   const UserCard({super.key, required this.user});
@@ -49,12 +50,18 @@ class UserCard extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      NetworkCircleAvatar(
-                        radius: 26,
-                        url: user.photoUrl,
-                        storagePath: user.photoPath,
-                        backgroundColor: Colors.white,
-                        placeholder: const Icon(Icons.person, color: Color(0xFFE53935), size: 30),
+                      BlurredImageWithUnblur(
+                        flaggedAsSensitive: user.photoFlaggedSensitive,
+                        width: 52,
+                        height: 52,
+                        borderRadius: BorderRadius.circular(26),
+                        child: NetworkCircleAvatar(
+                          radius: 26,
+                          url: user.photoUrl,
+                          storagePath: user.photoPath,
+                          backgroundColor: Colors.white,
+                          placeholder: const Icon(Icons.person, color: Color(0xFFE53935), size: 30),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(

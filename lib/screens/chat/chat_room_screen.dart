@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/image_moderation_service.dart';
+import '../../services/cat_detection_service.dart';
 import '../../models/app_user.dart';
 import '../../widgets/message_bubble.dart';
 
@@ -30,6 +31,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _notifs = NotificationService();
   final _storage = StorageService();
   final _moderation = ImageModerationService();
+  final _catDetection = CatDetectionService();
   final _imagePicker = ImagePicker();
   bool _sendingPhoto = false;
 
@@ -69,6 +71,43 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _otherName = (otherName != null && otherName.isNotEmpty) ? otherName : 'Chat';
         _otherUid = (otherUid != null && otherUid.isNotEmpty) ? otherUid : null;
       });
+    }
+  }
+
+  Future<void> _deleteMessage(String messageId, String? imagePath) async {
+    final chatId = _chatId;
+    if (chatId == null || chatId.isEmpty) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc(messageId)
+          .delete();
+      if (imagePath != null && imagePath.trim().isNotEmpty) {
+        await _storage.deleteByPath(imagePath);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message deleted'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final msg = e.toString().contains('PERMISSION_DENIED') || e.toString().contains('permission-denied')
+            ? 'Delete not allowed. Check Firestore rules (allow delete where senderId == auth.uid).'
+            : 'Could not delete: $e';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -114,8 +153,35 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (chatId == null || chatId.isEmpty || myUid == null) return;
     if (_sendingPhoto) return;
 
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Send photo'),
+        content: const Text(
+          'Take a new photo with the camera, or choose from your gallery.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(ImageSource.camera),
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Take photo'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            icon: const Icon(Icons.photo_library),
+            label: const Text('Gallery'),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
     final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       maxWidth: 1200,
       imageQuality: 85,
     );
@@ -127,9 +193,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     setState(() => _sendingPhoto = true);
 
     try {
-      final allowed = await _moderation.isImageAppropriate(bytes);
+      final result = await _moderation.getModerationResult(bytes);
       if (!mounted) return;
-      if (!allowed) {
+      if (!result.allowed) {
         setState(() => _sendingPhoto = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -143,8 +209,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         }
         return;
       }
+      // Use cloud flag; on Android also run local ML Kit so blur works even if cloud misses
+      bool imageFlaggedSensitive = result.containsCat;
+      if (!imageFlaggedSensitive) {
+        final localCat = await _catDetection.containsCatFromBytes(bytes);
+        if (!mounted) return;
+        imageFlaggedSensitive = localCat;
+      } else if (!mounted) return;
 
-      final url = await _storage.uploadChatPhoto(
+      final uploaded = await _storage.uploadChatPhoto(
         chatId: chatId,
         senderId: myUid,
         bytes: Uint8List.fromList(bytes),
@@ -157,7 +230,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           .collection('messages')
           .add({
         'text': '',
-        'imageUrl': url,
+        'imageUrl': uploaded.url,
+        'imagePath': uploaded.path,
+        'imageFlaggedSensitive': imageFlaggedSensitive,
         'senderId': myUid,
         'ts': FieldValue.serverTimestamp(),
       });
@@ -257,9 +332,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
-                    final data = docs[i].data() as Map<String, dynamic>;
+                    final doc = docs[i];
+                    final data = doc.data() as Map<String, dynamic>;
                     final text = (data['text'] ?? '').toString();
                     final imageUrl = (data['imageUrl'] ?? '').toString();
+                    final imagePath = (data['imagePath'] ?? '').toString();
+                    final imageFlaggedSensitive = data['imageFlaggedSensitive'] == true;
                     final senderId = (data['senderId'] ?? '').toString();
                     final mine = senderId == _myUid;
 
@@ -268,6 +346,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       isBot: false,
                       text: text,
                       imageUrl: imageUrl.isEmpty ? null : imageUrl,
+                      imageFlaggedSensitive: imageFlaggedSensitive,
+                      messageId: doc.id,
+                      imagePath: imagePath.isEmpty ? null : imagePath,
+                      onDeleteMessage: _deleteMessage,
                     );
                   },
                 );

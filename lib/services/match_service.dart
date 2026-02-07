@@ -12,6 +12,12 @@ class MatchService {
     required String otherUid,
     required String currentName,
     required String otherName,
+    String otherPhotoUrl = '',
+    String otherPhotoPath = '',
+    String currentPhotoUrl = '',
+    String currentPhotoPath = '',
+    bool otherPhotoFlaggedSensitive = false,
+    bool currentPhotoFlaggedSensitive = false,
   }) async {
     final otherLikeRef =
         _db.collection('likes').doc(otherUid).collection('liked').doc(currentUid);
@@ -45,7 +51,7 @@ class MatchService {
 
     final chatId = chatRef.id;
 
-    // save match for both users
+    // save match for both users (include photo so matches screen can show avatars)
     await _db
         .collection('matches')
         .doc(currentUid)
@@ -55,6 +61,9 @@ class MatchService {
       'uid': otherUid,
       'chatId': chatId,
       'name': otherName,
+      'photoUrl': otherPhotoUrl,
+      'photoPath': otherPhotoPath,
+      'photoFlaggedSensitive': otherPhotoFlaggedSensitive,
     });
 
     await _db
@@ -66,6 +75,9 @@ class MatchService {
       'uid': currentUid,
       'chatId': chatId,
       'name': currentName,
+      'photoUrl': currentPhotoUrl,
+      'photoPath': currentPhotoPath,
+      'photoFlaggedSensitive': currentPhotoFlaggedSensitive,
     });
 
     // notify both users of the match

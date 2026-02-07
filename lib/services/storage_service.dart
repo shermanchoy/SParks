@@ -82,9 +82,9 @@ class StorageService {
     return (photoUrl: url, photoPath: path);
   }
 
-  /// Uploads a chat photo and returns the public download URL.
+  /// Uploads a chat photo and returns the download URL and storage path (path for delete).
   /// Path: chat_photos/{chatId}/{timestamp}_{senderId}.jpg
-  Future<String> uploadChatPhoto({
+  Future<({String url, String path})> uploadChatPhoto({
     required String chatId,
     required String senderId,
     required Uint8List bytes,
@@ -126,7 +126,7 @@ class StorageService {
     }
 
     final url = await ref.getDownloadURL().timeout(const Duration(seconds: 30));
-    return url;
+    return (url: url, path: path);
   }
 
   Future<void> deleteByPath(String? path) async {

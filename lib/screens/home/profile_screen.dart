@@ -8,7 +8,9 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../utils/school_list.dart';
 import '../../services/storage_service.dart';
+import '../../services/cat_detection_service.dart';
 import '../../widgets/network_circle_avatar.dart';
+import '../../widgets/blurred_image_with_unblur.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -20,6 +22,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _db = FirestoreService();
   final _storage = StorageService();
+  final _catDetection = CatDetectionService();
 
   final _name = TextEditingController();
   final _course = TextEditingController();
@@ -41,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   AppUser? _current;
   String _photoUrl = '';
   String _photoPath = '';
+  bool _photoFlaggedSensitive = false;
   Uint8List? _localPhotoBytes; // immediate preview after picking
 
   @override
@@ -63,6 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _bio.text = u.bio;
       _photoUrl = u.photoUrl;
       _photoPath = u.photoPath;
+      _photoFlaggedSensitive = u.photoFlaggedSensitive;
 
       _school = SchoolList.schools.contains(u.school) ? u.school : SchoolList.schools.first;
       _intent = _intents.contains(u.intent) ? u.intent : _intents.first;
@@ -88,8 +93,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       final picker = ImagePicker();
+      final source = await showDialog<ImageSource>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Profile photo'),
+          content: const Text(
+            'Take a new photo with the camera, or choose from your gallery.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.of(ctx).pop(ImageSource.camera),
+              icon: const Icon(Icons.camera_alt),
+              label: const Text('Take photo'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Gallery'),
+            ),
+          ],
+        ),
+      );
+      if (source == null || !mounted) {
+        setState(() {
+          _photoBusy = false;
+          _photoProgress = null;
+        });
+        return;
+      }
+
       final file = await picker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 82,
         maxWidth: 1024,
       );
@@ -109,6 +147,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _localPhotoBytes = bytes;
         });
       }
+
+      final containsCat = await _catDetection.containsCatFromBytes(bytes);
+      if (!mounted) return;
 
       final oldPath = _photoPath;
       final uploaded = await _storage.uploadProfilePhoto(
@@ -133,6 +174,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _photoUrl = uploaded.photoUrl;
           _photoPath = uploaded.photoPath;
+          _photoFlaggedSensitive = containsCat;
           _photoBusy = false;
           _photoProgress = null;
           // keep local preview until remote loads fine
@@ -143,6 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _db.userRef(uid).set({
         'photoUrl': uploaded.photoUrl,
         'photoPath': uploaded.photoPath,
+        'photoFlaggedSensitive': containsCat,
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       }, SetOptions(merge: true)).timeout(const Duration(seconds: 20));
 
@@ -191,6 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _photoUrl = '';
         _photoPath = '';
+        _photoFlaggedSensitive = false;
         _localPhotoBytes = null;
         _photoBusy = false;
         _status = 'Photo removed';
@@ -324,47 +368,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   duration: const Duration(milliseconds: 420),
                   curve: Curves.easeOutBack,
                   builder: (context, v, child) => Transform.scale(scale: v, child: child),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      NetworkCircleAvatar(
-                        radius: 48,
-                        url: _photoUrl,
-                        storagePath: _photoPath,
-                        placeholder: const Icon(Icons.person, size: 44),
-                      ),
-                      if (_localPhotoBytes != null)
-                        IgnorePointer(
-                          child: ClipOval(
-                            child: Image.memory(
-                              _localPhotoBytes!,
-                              width: 96,
-                              height: 96,
-                              fit: BoxFit.cover,
-                              filterQuality: FilterQuality.medium,
-                              gaplessPlayback: true,
+                  child: BlurredImageWithUnblur(
+                    flaggedAsSensitive: _photoFlaggedSensitive,
+                    width: 96,
+                    height: 96,
+                    borderRadius: BorderRadius.circular(48),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        NetworkCircleAvatar(
+                          radius: 48,
+                          url: _photoUrl,
+                          storagePath: _photoPath,
+                          placeholder: const Icon(Icons.person, size: 44),
+                        ),
+                        if (_localPhotoBytes != null)
+                          IgnorePointer(
+                            child: ClipOval(
+                              child: Image.memory(
+                                _localPhotoBytes!,
+                                width: 96,
+                                height: 96,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.medium,
+                                gaplessPlayback: true,
+                              ),
                             ),
                           ),
-                        ),
-                      if (_photoBusy) ...[
-                        Positioned.fill(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black.withOpacity(0.10),
+                        if (_photoBusy) ...[
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black.withOpacity(0.10),
+                              ),
                             ),
                           ),
-                        ),
-                        Positioned.fill(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            value: (_photoProgress != null && _photoProgress! > 0 && _photoProgress! < 1)
-                                ? _photoProgress
-                                : null,
+                          Positioned.fill(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              value: (_photoProgress != null && _photoProgress! > 0 && _photoProgress! < 1)
+                                  ? _photoProgress
+                                  : null,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
