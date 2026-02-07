@@ -83,20 +83,6 @@ class _LoginScreenState extends State<LoginScreen> {
             Positioned.fill(
               child: _AnimatedSparkles(isDark: isDark),
             ),
-            // Singapore Poly logo as subtle watermark
-            Positioned.fill(
-              child: Center(
-                child: Opacity(
-                  opacity: isDark ? 0.08 : 0.12,
-                  child: Image.asset(
-                    'assets/sp_logo.png',
-                    width: 320,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            ),
             // Login content on top
             SafeArea(
               child: LayoutBuilder(
@@ -460,12 +446,12 @@ class _SparklePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), r, Paint()..color = color);
     }
 
-    // Golden dots – fewer, widely spaced (no streaks)
+    // Golden dots – same style, spread over full height so they cover the whole screen
     const dotCount = 48;
     for (var i = 0; i < dotCount; i++) {
       final baseX = (_h(i, 1) * 0.9 + 0.05) * size.width;
-      final baseY = _h(i, 2) * size.height * 1.5 - size.height * 0.25;
-      final y = (baseY + value * fallSpeed * 0.7) % (size.height + 120) - 60;
+      final baseY = _h(i, 2) * (size.height + 240) - 60;
+      final y = (baseY + value * fallSpeed * 0.7) % (size.height + 240) - 60;
       final x = baseX + math.sin(t * 0.2 + i * 0.4) * 12;
       final phase = _h(i, 3) * 2 * math.pi;
       final twinkle = (math.sin(t + phase) + 1) / 2;
@@ -478,12 +464,12 @@ class _SparklePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), radius, Paint()..color = color);
     }
 
-    // Star sparkles – fewer, well separated
+    // Star sparkles – same style, spread over full height so they cover the whole screen
     const starCount = 16;
     for (var i = 0; i < starCount; i++) {
       final baseX = (_h(i + 50, 1) * 0.85 + 0.075) * size.width;
-      final baseY = _h(i + 50, 2) * size.height * 1.4 - size.height * 0.2;
-      final y = (baseY + value * fallSpeed * 0.6) % (size.height + 140) - 70;
+      final baseY = _h(i + 50, 2) * (size.height + 280) - 70;
+      final y = (baseY + value * fallSpeed * 0.6) % (size.height + 280) - 70;
       final x = baseX + math.sin(t * 0.4 + i * 0.5) * 15;
       final phase = _h(i + 50, 3) * 2 * math.pi;
       final twinkle = (math.sin(t * 1.1 + phase) + 1) / 2;
