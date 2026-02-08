@@ -39,16 +39,30 @@ exports.moderateChatImage = onCall(
 
       let containsCat = false;
       const labels = labelResult[0]?.labelAnnotations || [];
-      const minScore = 0.3;
+      const minScore = 0.15;
+      const catTerms = [
+        "cat", "tabby", "kitten", "domestic cat", "feline", "felidae",
+        "cat face", "persian cat", "siamese", "maine coon", "cat breed",
+        "whiskers", "small to medium-sized cats",
+        "domestic short-haired cat", "domestic long-haired cat", "felis catus",
+        "big cat", "cat animal", "house cat",
+      ];
       for (const l of labels) {
         const desc = (l.description || "").toLowerCase().trim();
         const score = l.score || 0;
         if (score < minScore) continue;
-        if (desc === "cat" || desc.includes(" cat") || desc.includes("cat ") || desc === "tabby" || desc === "kitten" || desc === "domestic cat") {
+        const match = catTerms.some((term) => desc === term || desc.includes(term)) ||
+          /(^|\s)cat(\s|$)/.test(desc);
+        if (match) {
           containsCat = true;
           break;
         }
       }
+      if (!containsCat && labels.length > 0) {
+        const top = labels.slice(0, 15).map((l) => `${(l.description || "").toLowerCase()}:${(l.score || 0).toFixed(2)}`);
+        console.log("Vision labels (no cat match):", top.join(", "));
+      }
+      console.log("moderateChatImage returning:", { allowed, containsCat });
 
       return { allowed, containsCat };
     } catch (e) {
@@ -76,14 +90,23 @@ exports.detectCatInImage = onCall(
     }
     try {
       const [result] = await vision.labelDetection({ image: { content: imageBase64 } });
-      const labels = result.labelAnnotations || [];
+      const labels = result?.labelAnnotations || [];
       let containsCat = false;
-      const minScore = 0.3;
+      const minScore = 0.15;
+      const catTerms = [
+        "cat", "tabby", "kitten", "domestic cat", "feline", "felidae",
+        "cat face", "persian cat", "siamese", "maine coon", "cat breed",
+        "whiskers", "small to medium-sized cats",
+        "domestic short-haired cat", "domestic long-haired cat", "felis catus",
+        "big cat", "cat animal", "house cat",
+      ];
       for (const l of labels) {
         const desc = (l.description || "").toLowerCase().trim();
         const score = l.score || 0;
         if (score < minScore) continue;
-        if (desc === "cat" || desc.includes(" cat") || desc.includes("cat ") || desc === "tabby" || desc === "kitten" || desc === "domestic cat") {
+        const match = catTerms.some((term) => desc === term || desc.includes(term)) ||
+          /(^|\s)cat(\s|$)/.test(desc);
+        if (match) {
           containsCat = true;
           break;
         }

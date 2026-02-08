@@ -217,6 +217,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         imageFlaggedSensitive = localCat;
       } else if (!mounted) return;
 
+      // For now: blur all chat photos. Set to false to blur only when cat is detected.
+      imageFlaggedSensitive = true;
+
       final uploaded = await _storage.uploadChatPhoto(
         chatId: chatId,
         senderId: myUid,
@@ -337,7 +340,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     final text = (data['text'] ?? '').toString();
                     final imageUrl = (data['imageUrl'] ?? '').toString();
                     final imagePath = (data['imagePath'] ?? '').toString();
-                    final imageFlaggedSensitive = data['imageFlaggedSensitive'] == true;
+                    final rawFlag = data['imageFlaggedSensitive'];
+                    final imageFlaggedSensitive = rawFlag == true || rawFlag == 'true' || rawFlag == 1;
                     final senderId = (data['senderId'] ?? '').toString();
                     final mine = senderId == _myUid;
 

@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 /// Shows an image with an optional blur overlay when [flaggedAsSensitive] is true.
@@ -62,7 +63,8 @@ class _BlurredImageWithUnblurState extends State<BlurredImageWithUnblur> {
             child: ClipRRect(
               borderRadius: widget.borderRadius ?? BorderRadius.zero,
               child: Container(
-                color: Colors.black.withOpacity(0.6),
+                // Strong opacity so image is hidden even when BackdropFilter doesn't render (e.g. web)
+                color: Colors.black.withOpacity(kIsWeb ? 0.92 : 0.82),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                   child: Container(
