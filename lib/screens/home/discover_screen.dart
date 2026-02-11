@@ -83,7 +83,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
 
     try {
-      // get my name for storing into other user's matches doc
       final meDoc = await FirebaseFirestore.instance.collection('users').doc(currentUid).get();
       final me = meDoc.exists ? AppUser.fromDoc(meDoc) : null;
 
@@ -131,8 +130,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
 
     try {
-      // optional: record pass, if your MatchService has passUser
-      // await _match.passUser(currentUid: currentUid, otherUid: other.uid);
 
       if (!mounted) return;
 

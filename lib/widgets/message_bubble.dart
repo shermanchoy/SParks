@@ -6,14 +6,10 @@ class MessageBubble extends StatelessWidget {
   final bool isMe;
   final String text;
   final bool isBot;
-  /// Optional image URL for photo messages.
   final String? imageUrl;
-  /// When true, image is shown blurred with "obscene material" warning and Unblur button.
   final bool imageFlaggedSensitive;
-  /// For delete: message doc id and storage path of photo (if any).
   final String? messageId;
   final String? imagePath;
-  /// Called when user confirms delete (only for own messages). Pass messageId and imagePath.
   final void Function(String messageId, String? imagePath)? onDeleteMessage;
 
   const MessageBubble({

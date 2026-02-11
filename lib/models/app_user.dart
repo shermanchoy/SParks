@@ -10,10 +10,8 @@ class AppUser {
   final String bio;
   final List<String> interests;
 
-  /// Optional profile photo.
   final String photoUrl;
   final String photoPath;
-  /// When true, profile photo was flagged (e.g. cat detected) and is shown blurred with unblur option.
   final bool photoFlaggedSensitive;
 
   final DateTime createdAt;

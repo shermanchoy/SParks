@@ -3,12 +3,6 @@ const { ImageAnnotatorClient } = require("@google-cloud/vision");
 
 const vision = new ImageAnnotatorClient();
 
-/**
- * Callable: moderateChatImage
- * Body: { image: "<base64 string>" }
- * Returns: { allowed: boolean, containsCat?: boolean }
- * Uses Vision Safe Search + label detection (cat) so desktop/web can blur cat photos.
- */
 exports.moderateChatImage = onCall(
   { region: "us-central1", maxInstances: 10 },
   async (request) => {
@@ -39,30 +33,27 @@ exports.moderateChatImage = onCall(
 
       let containsCat = false;
       const labels = labelResult[0]?.labelAnnotations || [];
-      const minScore = 0.15;
+      const minScore = 0.1;
       const catTerms = [
         "cat", "tabby", "kitten", "domestic cat", "feline", "felidae",
         "cat face", "persian cat", "siamese", "maine coon", "cat breed",
         "whiskers", "small to medium-sized cats",
         "domestic short-haired cat", "domestic long-haired cat", "felis catus",
         "big cat", "cat animal", "house cat",
+        "bengal", "ragdoll", "british shorthair", "cat-like", "catlike",
       ];
       for (const l of labels) {
         const desc = (l.description || "").toLowerCase().trim();
         const score = l.score || 0;
         if (score < minScore) continue;
         const match = catTerms.some((term) => desc === term || desc.includes(term)) ||
-          /(^|\s)cat(\s|$)/.test(desc);
+          /(^|\s)cat(\s|$)/.test(desc) ||
+          /\bcat\b/.test(desc);
         if (match) {
           containsCat = true;
           break;
         }
       }
-      if (!containsCat && labels.length > 0) {
-        const top = labels.slice(0, 15).map((l) => `${(l.description || "").toLowerCase()}:${(l.score || 0).toFixed(2)}`);
-        console.log("Vision labels (no cat match):", top.join(", "));
-      }
-      console.log("moderateChatImage returning:", { allowed, containsCat });
 
       return { allowed, containsCat };
     } catch (e) {
@@ -72,12 +63,6 @@ exports.moderateChatImage = onCall(
   }
 );
 
-/**
- * Callable: detectCatInImage
- * Body: { image: "<base64 string>" }
- * Returns: { containsCat: boolean }
- * Used for profile photos and when client cannot run ML Kit (e.g. Windows/web).
- */
 exports.detectCatInImage = onCall(
   { region: "us-central1", maxInstances: 10 },
   async (request) => {
@@ -92,25 +77,37 @@ exports.detectCatInImage = onCall(
       const [result] = await vision.labelDetection({ image: { content: imageBase64 } });
       const labels = result?.labelAnnotations || [];
       let containsCat = false;
-      const minScore = 0.15;
+      const minScore = 0.1;
       const catTerms = [
         "cat", "tabby", "kitten", "domestic cat", "feline", "felidae",
         "cat face", "persian cat", "siamese", "maine coon", "cat breed",
         "whiskers", "small to medium-sized cats",
         "domestic short-haired cat", "domestic long-haired cat", "felis catus",
         "big cat", "cat animal", "house cat",
+        "bengal", "ragdoll", "british shorthair", "cat-like", "catlike",
       ];
+      const labelStr = labels
+        .filter((l) => (l.score || 0) >= minScore)
+        .map((l) => `${(l.description || "").toLowerCase()}:${(l.score || 0).toFixed(2)}`)
+        .join(", ");
+      console.log("detectCatInImage labels (score>=" + minScore + "):", labelStr || "(none)");
       for (const l of labels) {
         const desc = (l.description || "").toLowerCase().trim();
         const score = l.score || 0;
         if (score < minScore) continue;
         const match = catTerms.some((term) => desc === term || desc.includes(term)) ||
-          /(^|\s)cat(\s|$)/.test(desc);
+          /(^|\s)cat(\s|$)/.test(desc) ||
+          /\bcat\b/.test(desc);
         if (match) {
           containsCat = true;
+          console.log("detectCatInImage match:", desc, "score:", score);
           break;
         }
       }
+      if (!containsCat && labelStr) {
+        console.log("detectCatInImage NO cat match. Add one of these to catTerms if it is a cat image:", labelStr);
+      }
+      console.log("detectCatInImage returning containsCat:", containsCat);
       return { containsCat };
     } catch (e) {
       console.error("Vision API error:", e);

@@ -38,8 +38,8 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFE53935), // red
-              Color(0xFFFF6B6B), // softer red
+              Color(0xFFE53935),
+              Color(0xFFFF6B6B),
             ],
           ),
         ),

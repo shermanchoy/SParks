@@ -30,7 +30,6 @@ class UserCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // top banner
               Container(
                 height: 150,
                 width: double.infinity,

@@ -38,14 +38,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _saving = false;
   bool _photoBusy = false;
-  double? _photoProgress; // 0..1 while uploading
+  double? _photoProgress;
   String? _status;
 
   AppUser? _current;
   String _photoUrl = '';
   String _photoPath = '';
   bool _photoFlaggedSensitive = false;
-  Uint8List? _localPhotoBytes; // immediate preview after picking
+  Uint8List? _localPhotoBytes;
 
   @override
   void initState() {
@@ -149,6 +149,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       final containsCat = await _catDetection.containsCatFromBytes(bytes);
+      assert(() {
+        debugPrint('[ProfileScreen] containsCat=$containsCat, will set _photoFlaggedSensitive');
+        return true;
+      }());
       if (!mounted) return;
 
       final oldPath = _photoPath;
@@ -161,7 +165,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
       );
 
-      // Verify the URL is actually loadable (helps catch storage/CORS/rules issues immediately).
       if (mounted) {
         await precacheImage(
           NetworkImage(uploaded.photoUrl),
@@ -169,7 +172,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ).timeout(const Duration(seconds: 15));
       }
 
-      // Show the new photo immediately (even if the Firestore merge below fails).
       if (mounted) {
         setState(() {
           _photoUrl = uploaded.photoUrl;
@@ -177,11 +179,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _photoFlaggedSensitive = containsCat;
           _photoBusy = false;
           _photoProgress = null;
-          // keep local preview until remote loads fine
         });
       }
 
-      // Persist immediately so it "sticks" even if user doesn't hit Save Profile.
       await _db.userRef(uid).set({
         'photoUrl': uploaded.photoUrl,
         'photoPath': uploaded.photoPath,
@@ -189,7 +189,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       }, SetOptions(merge: true)).timeout(const Duration(seconds: 20));
 
-      // Delete old image (best-effort) after new one is safely stored.
       if (oldPath.trim().isNotEmpty && oldPath.trim() != uploaded.photoPath) {
         await _storage.deleteByPath(oldPath);
       }

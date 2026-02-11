@@ -6,7 +6,6 @@ class MatchService {
   final _db = FirebaseFirestore.instance;
   final _notifs = NotificationService();
 
-  /// returns chatId if matched, otherwise null
   Future<String?> likeUser({
     required String currentUid,
     required String otherUid,
@@ -25,13 +24,11 @@ class MatchService {
     final myLikeRef =
         _db.collection('likes').doc(currentUid).collection('liked').doc(otherUid);
 
-    // record my like
     await myLikeRef.set({
       'uid': otherUid,
       'ts': FieldValue.serverTimestamp(),
     });
 
-    // notify the other user they got a like
     await _notifs.pushLikeNotification(
       toUid: otherUid,
       fromUid: currentUid,
@@ -40,10 +37,8 @@ class MatchService {
 
     final otherLikeSnap = await otherLikeRef.get();
 
-    // NOT a match yet
     if (!otherLikeSnap.exists) return null;
 
-    // MATCH 🔥
     final chatRef = await _db.collection('chats').add({
       'users': [currentUid, otherUid],
       'createdAt': FieldValue.serverTimestamp(),
@@ -51,7 +46,6 @@ class MatchService {
 
     final chatId = chatRef.id;
 
-    // save match for both users (include photo so matches screen can show avatars)
     await _db
         .collection('matches')
         .doc(currentUid)
@@ -80,7 +74,6 @@ class MatchService {
       'photoFlaggedSensitive': currentPhotoFlaggedSensitive,
     });
 
-    // notify both users of the match
     await _notifs.pushMatchNotification(toUid: currentUid, otherName: otherName);
     await _notifs.pushMatchNotification(toUid: otherUid, otherName: currentName);
 

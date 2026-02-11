@@ -32,7 +32,6 @@ class FirestoreService {
     await userRef(user.uid).set(user.toMap(), SetOptions(merge: true));
   }
 
-  // ✅ ADD THIS: used by DiscoverScreen
   Future<List<DocumentSnapshot<Map<String, dynamic>>>> usersQuery({
     required int limit,
     required String excludeUid,

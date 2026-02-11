@@ -3,20 +3,28 @@ import 'dart:io';
 import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 
-const _minConfidence = 0.25;
+const _minConfidence = 0.15;
 
-/// True if the label is or contains "cat" (e.g. "Cat", "Domestic cat", "Tabby cat").
 bool _isCatLabel(String label) {
   final lower = label.trim().toLowerCase();
   if (lower == 'cat' || lower == 'kitten' || lower == 'tabby') return true;
-  if (lower.contains('cat')) return true; // "domestic cat", "tabby cat", etc.
+  if (lower.contains('cat')) return true;
   return false;
+}
+
+bool _isPng(List<int> bytes) {
+  if (bytes.length < 8) return false;
+  return bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4E &&
+      bytes[3] == 0x47;
 }
 
 Future<bool> detectCatFromBytesOnMobile(List<int> imageBytes) async {
   if (imageBytes.isEmpty) return false;
   final dir = await Directory.systemTemp.createTemp('cat_');
-  final file = File('${dir.path}/img.jpg');
+  final ext = _isPng(imageBytes) ? 'png' : 'jpg';
+  final file = File('${dir.path}/img.$ext');
   try {
     await file.writeAsBytes(imageBytes);
     return await _containsCatFromFile(file.path);

@@ -33,8 +33,6 @@ ThemeData buildSParksTheme({required bool isDark}) {
     scaffoldBackgroundColor: bg,
 
     appBarTheme: AppBarTheme(
-      // Default app bars should be readable in both themes.
-      // Gradient app bars override these values explicitly.
       backgroundColor: surface,
       elevation: 0,
       foregroundColor: cs.onSurface,

@@ -6,16 +6,11 @@ import 'package:firebase_storage/firebase_storage.dart';
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  /// Quick connectivity/rules probe for Firebase Storage.
-  ///
-  /// Returns a short human-readable status string.
   Future<String> probe({String? uid}) async {
     final p = (uid != null && uid.trim().isNotEmpty)
         ? 'profile_photos/${uid.trim()}/__probe__.txt'
         : '__probe__/ping.txt';
     try {
-      // Probe a path that should be allowed by your app's rules.
-      // We expect this to fail with "object-not-found" (that's GOOD) if rules/network are OK.
       await _storage.ref().child(p).getDownloadURL().timeout(const Duration(seconds: 10));
       return 'Storage reachable (probe file exists). Path: $p';
     } on TimeoutException {
@@ -33,9 +28,6 @@ class StorageService {
     }
   }
 
-  /// Uploads a profile photo and returns:
-  /// - photoUrl: public download URL
-  /// - photoPath: storage path (for later deletion/replacement)
   Future<({String photoUrl, String photoPath})> uploadProfilePhoto({
     required String uid,
     required Uint8List bytes,
@@ -58,7 +50,6 @@ class StorageService {
     });
 
     try {
-      // Avoid hanging forever if network/storage stalls.
       await task.timeout(const Duration(seconds: 35), onTimeout: () async {
         try {
           await task.cancel();
@@ -68,7 +59,6 @@ class StorageService {
         );
       });
     } on FirebaseException catch (e) {
-      // Surface the exact Storage error (permission-denied, unauthenticated, etc).
       throw FirebaseException(
         plugin: e.plugin,
         code: e.code,
@@ -82,8 +72,6 @@ class StorageService {
     return (photoUrl: url, photoPath: path);
   }
 
-  /// Uploads a chat photo and returns the download URL and storage path (path for delete).
-  /// Path: chat_photos/{chatId}/{timestamp}_{senderId}.jpg
   Future<({String url, String path})> uploadChatPhoto({
     required String chatId,
     required String senderId,
@@ -132,7 +120,6 @@ class StorageService {
   Future<void> deleteByPath(String? path) async {
     final p = path?.trim() ?? '';
     if (p.isEmpty) return;
-    // Best-effort cleanup. If the object doesn't exist (or rules deny), don't crash UX.
     try {
       await _storage.ref().child(p).delete().timeout(const Duration(seconds: 20));
     } catch (_) {}

@@ -3,9 +3,6 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-/// Shows an image with an optional blur overlay when [flaggedAsSensitive] is true.
-/// Displays a warning that the photo may contain obscene material and an "Unblur" button.
-/// On tap, the blur is removed for this widget's lifetime.
 class BlurredImageWithUnblur extends StatefulWidget {
   const BlurredImageWithUnblur({
     super.key,
@@ -63,7 +60,6 @@ class _BlurredImageWithUnblurState extends State<BlurredImageWithUnblur> {
             child: ClipRRect(
               borderRadius: widget.borderRadius ?? BorderRadius.zero,
               child: Container(
-                // Strong opacity so image is hidden even when BackdropFilter doesn't render (e.g. web)
                 color: Colors.black.withOpacity(kIsWeb ? 0.92 : 0.82),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),

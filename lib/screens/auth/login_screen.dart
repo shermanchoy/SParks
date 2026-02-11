@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart';
+import '../../utils/theme.dart';
 import '../../utils/validators.dart';
 import '../../widgets/primary_button.dart';
 import '../../routes.dart';
@@ -52,14 +53,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cs = theme.colorScheme;
-    final surface = isDark ? const Color(0xFF141417) : Colors.white;
-    final border = isDark ? const Color(0xFF2A2A2F) : const Color(0xFFE7E8EC);
-
-    final scaffoldBg = theme.scaffoldBackgroundColor ?? surface;
-    return Scaffold(
+    // Login screen always uses dark theme
+    return Theme(
+      data: buildSParksTheme(isDark: true),
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          final isDark = true; // always dark for login
+          final cs = theme.colorScheme;
+          final surface = isDark ? const Color(0xFF141417) : Colors.white;
+          final border = isDark ? const Color(0xFF2A2A2F) : const Color(0xFFE7E8EC);
+          final scaffoldBg = theme.scaffoldBackgroundColor ?? surface;
+          return Scaffold(
       backgroundColor: Colors.transparent,
       body: Material(
         type: MaterialType.transparency,
@@ -75,15 +80,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           child: Stack(
           children: [
-            // Animated gradient background (own widget so controller is always initialized)
             Positioned.fill(
               child: _AnimatedLoginBackground(isDark: isDark),
             ),
-            // Sparkles / glitter layer
             Positioned.fill(
               child: _AnimatedSparkles(isDark: isDark),
             ),
-            // Login content on top
             SafeArea(
               child: LayoutBuilder(
             builder: (context, constraints) {
@@ -100,7 +102,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                     const SizedBox(height: 32),
 
-                    // Logo – full logo visible, no crop
                     SizedBox(
                       width: 200,
                       height: 100,
@@ -137,7 +138,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 40),
 
-                    // Form – no box, sits directly on background
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Form(
@@ -298,10 +298,12 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+        },
+      ),
+    );
   }
 }
 
-/// Owns the animation controller so it's always initialized before use.
 class _AnimatedLoginBackground extends StatefulWidget {
   final bool isDark;
 
@@ -352,7 +354,6 @@ class _AnimatedLoginBackgroundState extends State<_AnimatedLoginBackground>
   }
 }
 
-/// Animated sparkles / glitter layer.
 class _AnimatedSparkles extends StatefulWidget {
   final bool isDark;
 
@@ -403,7 +404,6 @@ class _AnimatedSparklesState extends State<_AnimatedSparkles>
   }
 }
 
-/// Golden glitter shower: dense at top, thinning toward bottom, with stars and soft bokeh.
 class _SparklePainter extends CustomPainter {
   final double value;
   final bool isDark;
@@ -434,7 +434,6 @@ class _SparklePainter extends CustomPainter {
     final t = value * 2 * math.pi;
     const fallSpeed = 120.0;
 
-    // Soft bokeh – fewer, well spaced
     for (var i = 0; i < 4; i++) {
       final x = 0.15 * size.width + _h(i, 40) * size.width * 0.7;
       final y = _h(i, 41) * size.height * 0.5;
@@ -446,7 +445,6 @@ class _SparklePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), r, Paint()..color = color);
     }
 
-    // Golden dots – same style, spread over full height so they cover the whole screen
     const dotCount = 48;
     for (var i = 0; i < dotCount; i++) {
       final baseX = (_h(i, 1) * 0.9 + 0.05) * size.width;
@@ -464,7 +462,6 @@ class _SparklePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), radius, Paint()..color = color);
     }
 
-    // Star sparkles – same style, spread over full height so they cover the whole screen
     const starCount = 16;
     for (var i = 0; i < starCount; i++) {
       final baseX = (_h(i + 50, 1) * 0.85 + 0.075) * size.width;
@@ -483,7 +480,6 @@ class _SparklePainter extends CustomPainter {
       old.value != value || old.isDark != isDark;
 }
 
-/// Paints a slowly shifting gradient for the login background.
 class _LoginGradientPainter extends CustomPainter {
   final double value;
   final bool isDark;

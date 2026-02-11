@@ -51,9 +51,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       final me = AppUser.fromDoc(meDoc);
       if (!mounted) return;
       setState(() => _myName = me.name.trim().isEmpty ? 'Someone' : me.name.trim());
-    } catch (_) {
-      // best-effort; notifications can still send without name
-    }
+    } catch (_) {}
   }
 
   @override
@@ -133,7 +131,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       'ts': FieldValue.serverTimestamp(),
     });
 
-    // notify the other user (best-effort). If otherUid isn't provided, we skip.
     if (otherUid != null && otherUid.isNotEmpty) {
       await _notifs.pushMessageNotification(
         toUid: otherUid,
@@ -209,16 +206,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         }
         return;
       }
-      // Use cloud flag; on Android also run local ML Kit so blur works even if cloud misses
       bool imageFlaggedSensitive = result.containsCat;
       if (!imageFlaggedSensitive) {
         final localCat = await _catDetection.containsCatFromBytes(bytes);
         if (!mounted) return;
         imageFlaggedSensitive = localCat;
       } else if (!mounted) return;
-
-      // For now: blur all chat photos. Set to false to blur only when cat is detected.
-      imageFlaggedSensitive = true;
 
       final uploaded = await _storage.uploadChatPhoto(
         chatId: chatId,

@@ -9,7 +9,6 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/home/home_shell.dart';
 import 'screens/onboarding/splashscreen.dart';
 
-// ADD THIS
 import 'screens/chat/chat_room_screen.dart';
 
 class Routes {
@@ -20,11 +19,8 @@ class Routes {
   static const onboarding = '/onboarding';
   static const home = '/home';
 
-  // ADD THIS
   static const chat = '/chat';
 
-  /// Web-friendly chat route that survives refresh:
-  /// `/chat?chatId=...&otherUid=...&otherName=...`
   static String chatRoute({
     required String chatId,
     required String otherUid,
@@ -50,7 +46,6 @@ Map<String, WidgetBuilder> buildRoutes() {
     Routes.home: (_) => const HomeShell(),
     Routes.splash: (_) => const SplashScreen(),
 
-    // ADD THIS
     Routes.chat: (_) => const ChatRoomScreen(),
   };
 }

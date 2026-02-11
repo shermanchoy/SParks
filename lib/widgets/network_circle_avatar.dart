@@ -8,7 +8,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 class NetworkCircleAvatar extends StatelessWidget {
   final double radius;
   final String url;
-  final String storagePath; // preferred for web (auth-aware)
+  final String storagePath;
   final Color? backgroundColor;
   final Widget? placeholder;
 
@@ -38,7 +38,6 @@ class NetworkCircleAvatar extends StatelessWidget {
         child: (u.isEmpty && p.isEmpty)
             ? Center(child: fallback)
             : (kIsWeb && p.isNotEmpty)
-                // On web, prefer loading via Firebase Storage SDK so it uses auth.
                 ? _StorageBytesImage(radius: radius, path: p, fallback: fallback)
                 : Image.network(
                     u,
@@ -79,7 +78,6 @@ class _StorageBytesImage extends StatelessWidget {
 
   Future<Uint8List?> _load() async {
     final ref = FirebaseStorage.instance.ref().child(path);
-    // Profile photos can be a few MB even after compression (esp. PNG).
     return await ref.getData(15 * 1024 * 1024).timeout(const Duration(seconds: 25));
   }
 
@@ -99,7 +97,6 @@ class _StorageBytesImage extends StatelessWidget {
           );
         }
         if (snap.hasError) {
-          // Fallback: some web environments/plugins may not support getData reliably.
           return _StorageUrlImage(radius: radius, path: path, fallback: fallback);
         }
         final bytes = snap.data;

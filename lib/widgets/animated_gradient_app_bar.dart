@@ -6,8 +6,6 @@ class SparksTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // This title is primarily used on our gradient app bars.
-    // Use a high-contrast color consistently.
     final arksColor = theme.colorScheme.onPrimary;
 
     return RichText(

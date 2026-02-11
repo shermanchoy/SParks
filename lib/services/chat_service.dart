@@ -34,7 +34,6 @@ class ChatService {
         'lastMessage': '',
         'lastMessageAt': FieldValue.serverTimestamp(),
         'lastSenderId': '',
-        // optional names (useful for UI)
         'nameA': nameA ?? '',
         'nameB': nameB ?? '',
       });

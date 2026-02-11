@@ -26,7 +26,7 @@ class SparksTitle extends StatelessWidget {
         children: [
           const TextSpan(
             text: 'sp',
-            style: TextStyle(color: Color.fromARGB(255, 183, 0, 255)), // red
+            style: TextStyle(color: Color.fromARGB(255, 183, 0, 255)),
           ),
           TextSpan(
             text: 'arks',

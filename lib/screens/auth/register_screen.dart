@@ -103,7 +103,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       if (!mounted) return;
 
-                      // If you use named routes, change this to your login route
                       Navigator.of(context)
                           .pushNamedAndRemoveUntil('/login', (r) => false);
                     },
